@@ -76,6 +76,7 @@ local nepisodes
 local episode_reward
 
 local screen, reward, terminal = game_env:getState()
+local last_time = sys.clock()
 
 print("Iteration ..", step)
 while step < opt.steps do
@@ -102,9 +103,13 @@ while step < opt.steps do
     end
 
     if step%1000 == 0 then collectgarbage() end
+    if step%10 == 0 then
+      print("speed", 10 / (sys.clock() - last_time))
+      last_time = sys.clock()
+    end
 
     if step % opt.eval_freq == 0 and step > learn_start then
-
+        print("evaluating!")
         screen, reward, terminal = game_env:newGame()
 
         total_reward = 0
@@ -172,6 +177,7 @@ while step < opt.steps do
     end
 
     if step % opt.save_freq == 0 or step == opt.steps then
+        print("saving")
         local s, a, r, s2, term = agent.valid_s, agent.valid_a, agent.valid_r,
             agent.valid_s2, agent.valid_term
         agent.valid_s, agent.valid_a, agent.valid_r, agent.valid_s2,

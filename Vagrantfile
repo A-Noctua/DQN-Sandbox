@@ -48,6 +48,7 @@ Vagrant.configure(2) do |config|
   #    vb.gui = true
   #
       vb.memory = "12024"
+      vb.cpus = 8
   end
   #
   # View the documentation for the provider you are using for more
