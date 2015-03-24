@@ -2,8 +2,6 @@
   "name": "poc",
   "private": true,
   "dependencies": {
-    "bootstrap-sass-official": "~3.3.1",
-    "modernizr": "~2.8.1",
     "lodash": "3.5.0"
   }
 }
