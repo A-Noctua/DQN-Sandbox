@@ -19,55 +19,133 @@ class WithSimulation extends WithEvents
     @scheduleAt @clock.currentTime + after, work
 
 
-
-
 class window.World extends WithSimulation
   constructor:  (clock = new Clock)->
     super(clock)
     @player = new Player(clock, new Repo)
+    @trainer = new Trainer(@player)
 
-class User
+
+class Trainer
+  constructor: (@player, @brainOpts = {}) ->
+    @currentReward = null
+    @brain = new deepqlearn.Brain(@state.length, @actions.length)
+    @registerRewards()
+    @player.on('before-play-next', @actionOpportunity)
+
+  actions: [
+    { name: 'next-random'}
+  ].concat ( {name: 'next-genre', args: g} for g in genres )
+
+  actionOpportunity: =>
+    if @currentReward?
+      @brain.backward(@currentReward)
+    @currentReward = 0
+    action = @brain.forward(@state())
+
+
+
+  state: =>
+    track = @player.playingTrack
+    [
+      track.artistId
+      track.genreId
+      @player.preferenceFor(track)
+      @player.location.lat
+      @player.location.lon
+      @player.clock.realMinute()
+    ]
+
+  @registerRewards: =>
+    rewardsMap = {
+      'thumb-up' :  100
+      'thumb-down' : -100
+      'skip' : -100
+      'played-a-tick': 1
+      'turned-off': -20
+    }
+    for event, reward of rewardsMap
+      @player.on event, => @currentReward += reward
+
+
+class User extends WithSimulation
   constructor:(clock, @player) ->
     super(clock)
-
 
 
 class Player extends WithSimulation
   state: 'off'
 
-  constructor: (clock, @repo) -> super(clock)
-
-  lastStart: undefined
+  constructor: (clock, @repo) ->
+    super(clock)
+    @clock.on 'tick', =>
+      if @playingTrack?
+        @trigger('played-a-tick')
 
   play: (track) =>
     console.log "playing", track
-    @lastStart = @clock.currentTime
+    @turnOn() #it's implicit turn on action
     @playingTrack = track
+    @scheduleAfter track.length, =>
+      if(@playingTrack is track)
+        @playingTrack = null
+        @next()
+
+  preference: {}
+
+  thumbUp: =>
+    @preference[@playingTrack.id] = 1
+    @trigger('thumb-up')
+
+  thumbDown: =>
+    @preference[@playingTrack.id] = -1
+    @trigger('thumb-down')
+
+  preferenceFor: (track) => @preference[track.id] or 0
 
   playRandom: =>
     t = @repo.nextRandom()
     @play t
-    @scheduleAfter(t.length, @playRandom)
 
-  location: [30.011, 34.322]
+  playGenre: (genre) =>
+    t = @repo.nextInGenre(genre)
+    @play t
+
+  next: =>
+    @trigger('before-play-next')
+    @playRandom()
+
+  location: {lat: 30.011, lon: 34.322}
+
+  sessionLength: =>
+    if( @state is 'on')
+      @clock.currentTime - @sessionStart
 
   turnOn: =>
     if @state isnt 'on'
       @state = 'on'
+      @sessionStart = @clock.currentTime
       @trigger("turned-on")
+
+  skip: =>
+    @playingTrack = null
+    @trigger("skip")
+    next()
 
   turnOff: =>
     if @state isnt 'off'
+      @playingTrack = null
       @state = 'off'
       @trigger("turned-off")
 
 
 class Clock extends WithEvents
-  constructor: (@msPerTick = 1000) -> super()
+  # start at 6Am in the morning
+  constructor: (@msPerTick = 1000, @currentTime = 5 * 60) -> super()
 
-  currentTime: 0
   _intervalId: null
 
+  realMinute: => @currentTime % (24 * 60)
   tick: =>
     if (@currentTime % 10) is 0
       console.log "alive"
@@ -84,6 +162,9 @@ class Clock extends WithEvents
 
 class Track
   constructor: ({@id, @title, @artist, @genre, @length}) ->
+    @artistId  = randomArtists.indexOf(@artist)
+    @genreId = genres.indexOf(@genre)
+
 
 class Repo
   constructor: ->
@@ -98,7 +179,10 @@ class Repo
       length : _.random(1, 4)
     )
 
-  nextRandom: => @tracks[_.random(@tracks.length - 1)]
+  nextRandom: => _.sample @tracks
+
+  nextInGenre: (genre) => _.sample _.where(@tracks, genre: genre)
+
 
 genres = ['Hip Pop', 'Hard Rock', 'Alternative', 'Jazz', 'Dance', 'Rap', 'Classical', 'Comedy']
 randomArtists = ['Kai', 'Marcel', 'Laruent', 'Vipan', 'Amit', 'Tom', 'Matt', 'Adam', 'Josh', 'Trey', 'Lasse' ]
