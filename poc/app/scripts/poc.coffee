@@ -28,22 +28,34 @@ class window.World extends WithSimulation
 
 class Trainer
   constructor: (@player, @brainOpts = {}) ->
-    @currentReward = null
+    @actions = [
+      { name: 'next-random'}
+    ].concat ( {name: 'next-genre', genre: g} for g in Repo.genres )
+    @pendingReward = false
+    @currentReward = 0
     @brain = new deepqlearn.Brain(@state.length, @actions.length)
     @registerRewards()
-    @player.on('before-play-next', @actionOpportunity)
+    @player.on('before-play-next', @nextAction)
+    @player.on('turned-off', @reportReward)
 
-  actions: [
-    { name: 'next-random'}
-  ].concat ( {name: 'next-genre', args: g} for g in genres )
 
-  actionOpportunity: =>
-    if @currentReward?
+  nextAction: =>
+    @reportReward()
+    @executeAction()
+
+  reportReward: =>
+    if @pendingReward
+      console.log "reporting reward", @currentReward
       @brain.backward(@currentReward)
+      @pendingReward = false
+
+  executeAction: =>
+    actionIndex = @brain.forward(@state())
+    console.log "sending command", @actions[actionIndex]
+    @player.sendCommand(@actions[actionIndex])
+
     @currentReward = 0
-    action = @brain.forward(@state())
-
-
+    @pendingReward = true
 
   state: =>
     track = @player.playingTrack
@@ -56,7 +68,7 @@ class Trainer
       @player.clock.realMinute()
     ]
 
-  @registerRewards: =>
+  registerRewards: =>
     rewardsMap = {
       'thumb-up' :  100
       'thumb-down' : -100
@@ -65,7 +77,10 @@ class Trainer
       'turned-off': -20
     }
     for event, reward of rewardsMap
-      @player.on event, => @currentReward += reward
+      handler = (e,r) => =>
+        @currentReward += r
+
+      @player.on event, handler(event, reward)
 
 
 class User extends WithSimulation
@@ -76,11 +91,14 @@ class User extends WithSimulation
 class Player extends WithSimulation
   state: 'off'
 
+  nextStrategy: {name: 'random'}
+
   constructor: (clock, @repo) ->
     super(clock)
     @clock.on 'tick', =>
       if @playingTrack?
         @trigger('played-a-tick')
+
 
   play: (track) =>
     console.log "playing", track
@@ -88,8 +106,11 @@ class Player extends WithSimulation
     @playingTrack = track
     @scheduleAfter track.length, =>
       if(@playingTrack is track)
-        @playingTrack = null
         @next()
+
+  sendCommand: (cmd) =>
+    if _.startsWith(cmd.name, 'next-')
+      @nextStrategy = _.merge({}, cmd, name: cmd.name.replace('next-', ''))
 
   preference: {}
 
@@ -113,7 +134,12 @@ class Player extends WithSimulation
 
   next: =>
     @trigger('before-play-next')
-    @playRandom()
+    switch @nextStrategy.name
+      when 'random' then @playRandom()
+      when 'genre'
+        @playGenre(@nextStrategy.genre)
+      else
+        @playingTrack = null
 
   location: {lat: 30.011, lon: 34.322}
 
@@ -130,7 +156,7 @@ class Player extends WithSimulation
   skip: =>
     @playingTrack = null
     @trigger("skip")
-    next()
+    @next()
 
   turnOff: =>
     if @state isnt 'off'
@@ -147,8 +173,6 @@ class Clock extends WithEvents
 
   realMinute: => @currentTime % (24 * 60)
   tick: =>
-    if (@currentTime % 10) is 0
-      console.log "alive"
     @currentTime += 1
     @trigger("tick", @currentTime)
 
@@ -163,19 +187,21 @@ class Clock extends WithEvents
 class Track
   constructor: ({@id, @title, @artist, @genre, @length}) ->
     @artistId  = randomArtists.indexOf(@artist)
-    @genreId = genres.indexOf(@genre)
+    @genreId  = Repo.genres.indexOf(@genre)
 
 
 class Repo
   constructor: ->
     @tracks = _.times(1000, @randomTrack)
 
+  @genres: ['Hip Pop', 'Hard Rock', 'Alternative', 'Jazz', 'Dance', 'Rap', 'Classical', 'Comedy']
+
   randomTrack: (id)->
     new Track(
       id     : id
       title  : _.capitalize(_.sample(randomWords, _.random(1, 10)).join(' '))
       artist : _.sample(randomArtists)
-      genre  : _.sample(genres)
+      genre  : _.sample(Repo.genres)
       length : _.random(1, 4)
     )
 
@@ -184,7 +210,7 @@ class Repo
   nextInGenre: (genre) => _.sample _.where(@tracks, genre: genre)
 
 
-genres = ['Hip Pop', 'Hard Rock', 'Alternative', 'Jazz', 'Dance', 'Rap', 'Classical', 'Comedy']
+
 randomArtists = ['Kai', 'Marcel', 'Laruent', 'Vipan', 'Amit', 'Tom', 'Matt', 'Adam', 'Josh', 'Trey', 'Lasse' ]
 
 billyJoe = """Woah, oh, oh
