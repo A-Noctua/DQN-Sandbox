@@ -5,6 +5,10 @@ class WithEvents
 class WithSimulation extends WithEvents
   constructor: (@clock) -> super()
 
+  byChance: (chance, f) ->
+    if _.random(1, true) <= chance
+      f()
+
   scheduleAt: (at, work) =>
     if !(at > @clock.currentTime)
       console.error("can't schedule at " + at)
@@ -24,13 +28,17 @@ class window.World extends WithSimulation
     super(clock)
     @player = new Player(clock, new Repo)
     @trainer = new Trainer(@player)
+    @user = new User(clock, @player)
 
 
 class Trainer
   constructor: (@player, @brainOpts = {}) ->
+    nextByGenres = ( {name: 'next-genre', genre: g} for g in Repo.genres )
     @actions = [
       { name: 'next-random'}
-    ].concat ( {name: 'next-genre', genre: g} for g in Repo.genres )
+      { name: 'next-preferred'}
+    ].concat nextByGenres
+
     @pendingReward = false
     @currentReward = 0
     @brain = new deepqlearn.Brain(@state.length, @actions.length)
@@ -86,6 +94,13 @@ class Trainer
 class User extends WithSimulation
   constructor:(clock, @player) ->
     super(clock)
+    @player.on 'played-a-tick', @reactToPlayingTrack
+
+  reactToPlayingTrack: (track) =>
+    if _.includes(@player.preferredGenres, track.genre)
+      @byChance 0.6, @player.thumbUp
+    else
+      @byChance 0.2, @player.thumbDown
 
 
 class Player extends WithSimulation
@@ -95,9 +110,10 @@ class Player extends WithSimulation
 
   constructor: (clock, @repo) ->
     super(clock)
+    @preferredGenres = _.sample(Repo.genres, 3)
     @clock.on 'tick', =>
       if @playingTrack?
-        @trigger('played-a-tick')
+        @trigger('played-a-tick', @playingTrack)
 
 
   play: (track) =>
@@ -112,30 +128,29 @@ class Player extends WithSimulation
     if _.startsWith(cmd.name, 'next-')
       @nextStrategy = _.merge({}, cmd, name: cmd.name.replace('next-', ''))
 
-  preference: {}
+  trackPreference: {}
 
   thumbUp: =>
-    @preference[@playingTrack.id] = 1
+    @trackPreference[@playingTrack.id] = 1
     @trigger('thumb-up')
 
   thumbDown: =>
-    @preference[@playingTrack.id] = -1
+    @trackPreference[@playingTrack.id] = -1
     @trigger('thumb-down')
 
-  preferenceFor: (track) => @preference[track.id] or 0
+  preferenceFor: (track) => @trackPreference[track.id] or 0
 
-  playRandom: =>
-    t = @repo.nextRandom()
-    @play t
+  playRandom: => @play @repo.nextRandom()
 
-  playGenre: (genre) =>
-    t = @repo.nextInGenre(genre)
-    @play t
+  playGenre: (genre) => @play @repo.nextInGenre(genre)
+
+  playPreferredGenre: => @playGenre  _.sample(@preferredGenres)
 
   next: =>
     @trigger('before-play-next')
     switch @nextStrategy.name
       when 'random' then @playRandom()
+      when 'preferred' then @playRandom()
       when 'genre'
         @playGenre(@nextStrategy.genre)
       else
