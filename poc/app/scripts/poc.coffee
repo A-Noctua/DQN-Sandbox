@@ -180,7 +180,7 @@ class Player extends WithSimulation
       @trigger("turned-off")
 
 
-class Clock extends WithEvents
+class window.Clock extends WithEvents
   # start at 6Am in the morning
   constructor: (@msPerTick = 1000, @currentTime = 5 * 60) -> super()
 
