@@ -30,6 +30,17 @@ class window.World extends WithSimulation
     @trainer = new Trainer(@player)
     @user = new User(clock, @player)
 
+  slowdown: ->
+    @setNewSpeed(1000)
+
+  speedup: ->
+    @setNewSpeed(0)
+
+  setNewSpeed: (msPerTick) ->
+    @clock.stop()
+    @clock.msPerTick = msPerTick
+    @clock.start()
+
 
 class Trainer
   constructor: (@player, @brainOpts = {}) ->
@@ -58,7 +69,9 @@ class Trainer
       @pendingReward = false
 
   executeAction: =>
-    actionIndex = @brain.forward(@state())
+    state = @state()
+    console.log "reporting state", state
+    actionIndex = @brain.forward(state)
     console.log "sending command", @actions[actionIndex]
     @player.sendCommand(@actions[actionIndex])
 
@@ -68,21 +81,21 @@ class Trainer
   state: =>
     track = @player.playingTrack
     [
-      track.artistId
-      track.genreId
+      track.artistId / 20.0
+      track.genreId / 30.0
       @player.preferenceFor(track)
-      @player.location.lat
-      @player.location.lon
-      @player.clock.realMinute()
+      @player.location.lat / 100.0
+      @player.location.lon / 100.0
+      @player.clock.realMinute()  / (24.0 * 60)
     ]
 
   registerRewards: =>
     rewardsMap = {
-      'thumb-up' :  100
-      'thumb-down' : -100
-      'skip' : -100
-      'played-a-tick': 1
-      'turned-off': -20
+      'thumb-up' :  0.8
+      'thumb-down' : -0.8
+      'skip' : -0.2
+      'played-a-tick': 0.01
+      'turned-off': -0.02
     }
     for event, reward of rewardsMap
       handler = (e,r) => =>

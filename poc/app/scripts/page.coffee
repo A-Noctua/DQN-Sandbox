@@ -7,3 +7,7 @@ document.addEventListener "DOMContentLoaded", ->
 
   world.clock.on 'tick', ->
     world.trainer.brain.visSelf(document.getElementById('brain-info'));
+
+  document.getElementById('preferred-genres').innerText = world.player.preferredGenres.join(', ')
+
+
