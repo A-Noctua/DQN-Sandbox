@@ -13,11 +13,8 @@ class WithSimulation extends WithEvents
     if !(at > @clock.currentTime)
       console.error("can't schedule at " + at)
     else
-      callback = (time) =>
-        if at is time
-          work()
-          @clock.off 'tick', callback
-      @clock.on 'tick', callback
+      eventName = 'tick-' + at
+      @clock.once eventName, work
 
   scheduleAfter: (after, work) =>
     @scheduleAt @clock.currentTime + after, work
@@ -31,7 +28,7 @@ class window.World extends WithSimulation
     @user = new User(clock, @player)
 
   slowdown: ->
-    @setNewSpeed(1000)
+    @setNewSpeed(500)
 
   speedup: ->
     @setNewSpeed(0)
@@ -47,12 +44,12 @@ class Trainer
     nextByGenres = ( {name: 'next-genre', genre: g} for g in Repo.genres )
     @actions = [
       { name: 'next-random'}
-      { name: 'next-preferred'}
+#      { name: 'next-preferred'}
     ].concat nextByGenres
 
     @pendingReward = false
     @currentReward = 0
-    @brain = new deepqlearn.Brain(@state.length, @actions.length)
+    @brain = new deepqlearn.Brain(@state.length, @actions.length, temporal_window: 10)
     @registerRewards()
     @player.on('before-play-next', @nextAction)
     @player.on('turned-off', @reportReward)
@@ -94,7 +91,7 @@ class Trainer
       'thumb-up' :  0.8
       'thumb-down' : -0.8
       'skip' : -0.2
-      'played-a-tick': 0.01
+      'played-a-tick': 0.002
       'turned-off': -0.02
     }
     for event, reward of rewardsMap
@@ -107,11 +104,17 @@ class Trainer
 class User extends WithSimulation
   constructor:(clock, @player) ->
     super(clock)
-    @player.on 'played-a-tick', @reactToPlayingTrack
+    @player.on 'started-track', @reactToPlayingTrack
+    @history = FixedArray(10)
+    @preferredGenres = _.sample(Repo.genres, 4)
+#    player.preferredGenres = @preferredGenres
 
   reactToPlayingTrack: (track) =>
-    if _.includes(@player.preferredGenres, track.genre)
-      @byChance 0.6, @player.thumbUp
+    @history.push(track)
+    if _.includes(@preferredGenres, track.genre)
+      chance = (6 - _.where(@history.values(), genre: track.genre).length ) / 20
+      if chance > 0
+        @byChance chance, @player.thumbUp
     else
       @byChance 0.2, @player.thumbDown
 
@@ -123,7 +126,6 @@ class Player extends WithSimulation
 
   constructor: (clock, @repo) ->
     super(clock)
-    @preferredGenres = _.sample(Repo.genres, 3)
     @clock.on 'tick', =>
       if @playingTrack?
         @trigger('played-a-tick', @playingTrack)
@@ -133,8 +135,10 @@ class Player extends WithSimulation
     console.log "playing", track
     @turnOn() #it's implicit turn on action
     @playingTrack = track
+    @trigger('started-track', track)
     @scheduleAfter track.length, =>
       if(@playingTrack is track)
+        @trigger('finished-track', track)
         @next()
 
   sendCommand: (cmd) =>
@@ -203,13 +207,13 @@ class window.Clock extends WithEvents
   tick: =>
     @currentTime += 1
     @trigger("tick", @currentTime)
+    @trigger("tick-" + @currentTime)
 
   start: => @_intervalId ?= setInterval(@tick, @msPerTick)
   stop: =>
     if @_intervalId?
       clearInterval @_intervalId
       @_intervalId = null
-
 
 
 class Track
@@ -230,7 +234,7 @@ class Repo
       title  : _.capitalize(_.sample(randomWords, _.random(1, 10)).join(' '))
       artist : _.sample(randomArtists)
       genre  : _.sample(Repo.genres)
-      length : _.random(1, 4)
+      length : _.random(2, 5)
     )
 
   nextRandom: => _.sample @tracks

@@ -14,16 +14,29 @@
   <script src="scripts/backbone.events.js"></script>
   <script src="scripts/deepqlearn.js"></script>
   <script src="bower_components/lodash/lodash.js"></script>
+  <script src="scripts/fixedArray.js"></script>
   <script src="scripts/poc.js"></script>
   <script src="scripts/page.js"></script>
 
 </head>
 <body>
-<div id="brain-info">
-</div>
+
 <hr />
 <h3>User Preferred Genres</h3>
 <div id="preferred-genres"></div>
+</div>
+
+<hr />
+<h3>Recent playing history</h3>
+<div id="play-history"></div>
+</div>
+
+<button onclick="world.slowdown()">Slowdown</button>
+<button onclick="world.speedup()">Speedup</button>
+<hr />
+<h3>training info</h3>
+
+<div id="brain-info">
 </div>
 </body>
 </html>
