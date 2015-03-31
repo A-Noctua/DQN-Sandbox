@@ -20,7 +20,10 @@ document.addEventListener "DOMContentLoaded", ->
 
   _updateBrianInfo = -> world.trainer.brain.visSelf($('brain-info'));
 
-  world.clock.on 'tick', _.throttle(_updateBrianInfo, 300)
+  world.clock.on 'tick', =>
+    _.throttle(_updateBrianInfo, 300)()
+    updateHistory()
+
 
   $('preferred-genres').innerText = world.user.preferredGenres.join(', ')
 
@@ -33,6 +36,5 @@ document.addEventListener "DOMContentLoaded", ->
 
   world.player.on 'started-track', (track)->
     history.push {time: world.clock.currentTime, track: track, displayTime: displayTime(world.clock.realMinute()) }
-    updateHistory()
 
 

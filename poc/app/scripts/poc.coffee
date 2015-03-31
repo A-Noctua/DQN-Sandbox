@@ -114,6 +114,9 @@ class User extends WithSimulation
     @history = FixedArray(10)
     @preferredGenres = _.sample(Repo.genres, 4)
 #    player.preferredGenres = @preferredGenres
+    @scheduleDaily(6, 30, => @player.playRandom() )
+    @scheduleDaily(7, 30, => @player.turnOff() )
+
 
   reactToPlayingTrack: (track) =>
     @history.push(track)
