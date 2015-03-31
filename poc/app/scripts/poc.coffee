@@ -34,15 +34,10 @@ class window.World extends WithSimulation
     @user = new User(clock, @player)
 
   slowdown: ->
-    @setNewSpeed(500)
+    @clock.setNewSpeed(500)
 
   speedup: ->
-    @setNewSpeed(0)
-
-  setNewSpeed: (msPerTick) ->
-    @clock.stop()
-    @clock.msPerTick = msPerTick
-    @clock.start()
+    @clock.setNewSpeed(0)
 
 
 class Trainer
@@ -211,6 +206,11 @@ class window.Clock extends WithEvents
   # start at 6Am in the morning
   constructor: (@msPerTick = 1000, @currentTime = 5 * 60) -> super()
 
+  setNewSpeed: (msPerTick) ->
+    @stop()
+    @msPerTick = msPerTick
+    @start()
+
   _intervalId: null
 
   realMinute: => @currentTime % (24 * 60) #minute of the day
@@ -224,7 +224,14 @@ class window.Clock extends WithEvents
     @trigger("tick", @currentTime)
     @trigger("tick-" + @currentTime)
 
-  start: => @_intervalId ?= setInterval(@tick, @msPerTick)
+  multipleTicks: =>
+    if @msPerTick is 0
+      for i in [0..100]
+        @tick()
+    else @tick()
+
+
+  start: => @_intervalId ?= setInterval(@multipleTicks, @msPerTick)
   stop: =>
     if @_intervalId?
       clearInterval @_intervalId
