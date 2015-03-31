@@ -19,6 +19,12 @@ class WithSimulation extends WithEvents
   scheduleAfter: (after, work) =>
     @scheduleAt @clock.currentTime + after, work
 
+  scheduleDaily: (hour, minute, work) =>
+    @clock.on 'tick', =>
+      if @clock.hour() is hour and @clock.minute() is minute
+        work()
+
+
 
 class window.World extends WithSimulation
   constructor:  (clock = new Clock)->
@@ -203,7 +209,12 @@ class window.Clock extends WithEvents
 
   _intervalId: null
 
-  realMinute: => @currentTime % (24 * 60)
+  realMinute: => @currentTime % (24 * 60) #minute of the day
+
+  hour: => Math.floor(@realMinute() / 60) #hour of the day
+  minute: => @currentTime % 60 #minute of the hour
+  day: => Math.floor(@currentTime / (24 * 60))
+
   tick: =>
     @currentTime += 1
     @trigger("tick", @currentTime)

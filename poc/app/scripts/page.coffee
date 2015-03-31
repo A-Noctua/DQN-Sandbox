@@ -16,16 +16,16 @@ document.addEventListener "DOMContentLoaded", ->
     minute = timeInMinute % 60
     "#{hr}:#{minute}"
 
-  world.clock.on 'tick', ->
-    world.trainer.brain.visSelf(document.getElementById('brain-info'));
+  _updateBrianInfo = -> world.trainer.brain.visSelf(document.getElementById('brain-info'));
 
-#  world.slowdown()
+  world.clock.on 'tick', _.throttle(_updateBrianInfo, 300)
 
   document.getElementById('preferred-genres').innerText = world.user.preferredGenres.join(', ')
 
 
   _updateHistory = ->
     document.getElementById('play-history').innerHTML = _.map(history.values(), historyItemTemplate).join('<br/>')
+    document.getElementById('current-time').innerHTML = "Day-#{world.clock.day()}  #{world.clock.hour()}:#{world.clock.minute()} "
 
   updateHistory = _.throttle(_updateHistory, 1000)
 
