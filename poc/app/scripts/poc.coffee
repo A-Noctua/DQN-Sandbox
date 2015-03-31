@@ -55,7 +55,7 @@ class Trainer
 
     @pendingReward = false
     @currentReward = 0
-    @brain = new deepqlearn.Brain(@state.length, @actions.length, temporal_window: 10)
+    @brain = new deepqlearn.Brain(@state().length, @actions.length, temporal_window: 10)
     @registerRewards()
     @player.on('before-play-next', @nextAction)
     @player.on('turned-off', @reportReward)
@@ -82,7 +82,7 @@ class Trainer
     @pendingReward = true
 
   state: =>
-    track = @player.playingTrack
+    track = @player.playingTrack or Track.empty()
     [
       track.artistId / 20.0
       track.genreId / 30.0
@@ -96,9 +96,9 @@ class Trainer
     rewardsMap = {
       'thumb-up' :  0.8
       'thumb-down' : -0.8
-      'skip' : -0.2
+      'skip' : -0.4
       'played-a-tick': 0.002
-      'turned-off': -0.02
+      'turned-off': 0
     }
     for event, reward of rewardsMap
       handler = (e,r) => =>
@@ -123,6 +123,7 @@ class User extends WithSimulation
         @byChance chance, @player.thumbUp
     else
       @byChance 0.2, @player.thumbDown
+      @byChance 0.5, @player.skip
 
 
 class Player extends WithSimulation
@@ -228,8 +229,10 @@ class window.Clock extends WithEvents
 
 
 class Track
+  @empty: => new Track(id: 0, title: "", length: 0)
+
   constructor: ({@id, @title, @artist, @genre, @length}) ->
-    @artistId  = randomArtists.indexOf(@artist)
+    @artistId  = Repo.randomArtists.indexOf(@artist)
     @genreId  = Repo.genres.indexOf(@genre)
 
 
@@ -238,12 +241,12 @@ class Repo
     @tracks = _.times(1000, @randomTrack)
 
   @genres: ['Hip Pop', 'Hard Rock', 'Alternative', 'Jazz', 'Dance', 'Rap', 'Classical', 'Comedy']
-
+  @randomArtists: ['Kai', 'Marcel', 'Laruent', 'Vipan', 'Amit', 'Tom', 'Matt', 'Adam', 'Josh', 'Trey', 'Lasse' ]
   randomTrack: (id)->
     new Track(
       id     : id
       title  : _.capitalize(_.sample(randomWords, _.random(1, 10)).join(' '))
-      artist : _.sample(randomArtists)
+      artist : _.sample(Repo.randomArtists)
       genre  : _.sample(Repo.genres)
       length : _.random(2, 5)
     )
@@ -254,7 +257,7 @@ class Repo
 
 
 
-randomArtists = ['Kai', 'Marcel', 'Laruent', 'Vipan', 'Amit', 'Tom', 'Matt', 'Adam', 'Josh', 'Trey', 'Lasse' ]
+
 
 billyJoe = """Woah, oh, oh
 For the longest time
