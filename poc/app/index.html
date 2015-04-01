@@ -29,11 +29,12 @@
 <hr />
 <h4><a id="current-time"></a></h4>
 <h3>Recent playing history</h3>
-<div id="play-history"></div>
+<div id="play-history" style="height: 300px; overflow: auto"></div>
 </div>
 
-<button onclick="world.slowdown()">Slowdown</button>
-<button onclick="world.speedup()">Speedup</button>
+<button onclick="world.clock.setNewSpeed(500)">Slow</button>
+<button onclick="world.clock.setNewSpeed(1)">Faster</button>
+<button onclick="world.clock.setNewSpeed(0)">Fastest</button>
 <button onclick="world.trainer.brain.learning = false">Stop Learning</button>
 <button onclick="world.trainer.brain.learning = true">Start Learning</button>
 <hr />

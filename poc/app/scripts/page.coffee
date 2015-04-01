@@ -3,11 +3,10 @@ _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 $ = (id) -> document.getElementById id
 
 document.addEventListener "DOMContentLoaded", ->
-  world = new World(new Clock(0))
+  world = new World(new Clock(500))
   world.clock.start()
-  world.player.playRandom()
   window.world = world
-  history = FixedArray(20)
+  history = FixedArray(100)
 
   historyItemTemplate = _.template """
     <b>{{ displayTime }}</b> - id: {{ track.id }}, genre: {{ track.genre }}, artist: {{ track.artist }}, title: {{ track.title }}
@@ -25,16 +24,15 @@ document.addEventListener "DOMContentLoaded", ->
     updateHistory()
 
 
-  $('preferred-genres').innerText = world.user.preferredGenres.join(', ')
-
+  $('preferred-genres').innerText = world.user.currentActivity.preferredGenres.join(', ')
 
   _updateHistory = ->
     $('play-history').innerHTML = _.map(history.values(), historyItemTemplate).join('<br/>')
-    $('current-time').innerHTML = "Day-#{world.clock.day()}  #{world.clock.hour()}:#{world.clock.minute()} "
+    $('current-time').innerHTML = "Day-#{world.clock.time.day}  #{world.clock.time.hour}:#{world.clock.time.minute} "
 
   updateHistory = _.throttle(_updateHistory, 1000)
 
   world.player.on 'started-track', (track)->
-    history.push {time: world.clock.currentTime, track: track, displayTime: displayTime(world.clock.realMinute()) }
+    history.push {time: world.clock.now, track: track, displayTime: world.clock.time.display() }
 
 

@@ -1,3 +1,6 @@
+log = (msg) =>
+#  console.log msg
+
 class WithEvents
   constructor: ->
     _.assign(this, Backbone.Events)
@@ -10,18 +13,19 @@ class WithSimulation extends WithEvents
       f()
 
   scheduleAt: (at, work) =>
-    if !(at > @clock.currentTime)
+    if !(at > @clock.time.absoluteMinute)
       console.error("can't schedule at " + at)
     else
       eventName = 'tick-' + at
       @clock.once eventName, work
 
   scheduleAfter: (after, work) =>
-    @scheduleAt @clock.currentTime + after, work
+    @scheduleAt @clock.time.absoluteMinute + after, work
 
-  scheduleDaily: (hour, minute, work) =>
-    @clock.on 'tick', =>
-      if @clock.hour() is hour and @clock.minute() is minute
+  scheduleDaily: (time, work) =>
+    log time
+    @clock.on 'tick', (t) =>
+      if t.hour is time.hour and t.minute is time.minute
         work()
 
 
@@ -33,11 +37,6 @@ class window.World extends WithSimulation
     @trainer = new Trainer(@player)
     @user = new User(clock, @player)
 
-  slowdown: ->
-    @clock.setNewSpeed(500)
-
-  speedup: ->
-    @clock.setNewSpeed(0)
 
 
 class Trainer
@@ -62,15 +61,15 @@ class Trainer
 
   reportReward: =>
     if @pendingReward
-      console.log "reporting reward", @currentReward
+      log "reporting reward", @currentReward
       @brain.backward(@currentReward)
       @pendingReward = false
 
   executeAction: =>
     state = @state()
-    console.log "reporting state", state
+    log "reporting state", state
     actionIndex = @brain.forward(state)
-    console.log "sending command", @actions[actionIndex]
+    log "sending command", @actions[actionIndex]
     @player.sendCommand(@actions[actionIndex])
 
     @currentReward = 0
@@ -84,7 +83,7 @@ class Trainer
       @player.preferenceFor(track)
       @player.location.lat / 100.0
       @player.location.lon / 100.0
-      @player.clock.realMinute()  / (24.0 * 60)
+      @player.clock.time.minuteOfDay / (24 * 60)
     ]
 
   registerRewards: =>
@@ -107,21 +106,29 @@ class User extends WithSimulation
     super(clock)
     @player.on 'started-track', @reactToPlayingTrack
     @history = FixedArray(10)
-    @preferredGenres = _.sample(Repo.genres, 4)
-#    player.preferredGenres = @preferredGenres
-    @scheduleDaily(6, 30, => @player.playRandom() )
-    @scheduleDaily(7, 30, => @player.turnOff() )
+    @currentActivity = new ActivityWithPreferredGenres(this, _.sample(Repo.genres, 4))
+    @scheduleDaily(Time.fromHour(6, 30), => @player.playRandom() )
+    @scheduleDaily(Time.fromHour(8, 30),  => @player.turnOff() )
 
 
   reactToPlayingTrack: (track) =>
     @history.push(track)
+    @currentActivity.respondToTrack(track)
+
+class ActivityWithPreferredGenres extends WithSimulation
+
+  constructor: (@user, @preferredGenres) ->
+    super(@user.clock)
+
+  respondToTrack: (track) =>
     if _.includes(@preferredGenres, track.genre)
-      chance = (6 - _.where(@history.values(), genre: track.genre).length ) / 20
+      chance = (6 - _.where(@user.history.values(), genre: track.genre).length ) / 20
       if chance > 0
-        @byChance chance, @player.thumbUp
+        @byChance chance, @user.player.thumbUp
     else
-      @byChance 0.2, @player.thumbDown
-      @byChance 0.5, @player.skip
+      @byChance 0.2, @user.player.thumbDown
+      @byChance 0.5, @user.player.skip
+
 
 
 class Player extends WithSimulation
@@ -137,7 +144,7 @@ class Player extends WithSimulation
 
 
   play: (track) =>
-    console.log "playing", track
+    log "playing", track
     @turnOn() #it's implicit turn on action
     @playingTrack = track
     @trigger('started-track', track)
@@ -180,14 +187,10 @@ class Player extends WithSimulation
 
   location: {lat: 30.011, lon: 34.322}
 
-  sessionLength: =>
-    if( @state is 'on')
-      @clock.currentTime - @sessionStart
 
   turnOn: =>
     if @state isnt 'on'
       @state = 'on'
-      @sessionStart = @clock.currentTime
       @trigger("turned-on")
 
   skip: =>
@@ -201,10 +204,25 @@ class Player extends WithSimulation
       @state = 'off'
       @trigger("turned-off")
 
+class Time
+  constructor: (@absoluteMinute) ->
+    @minute = @absoluteMinute % 60
+    @day =  Math.floor(@absoluteMinute / (24 * 60))
+    @hour = Math.floor(@absoluteMinute % (24 * 60) / 60)
+    @minuteOfDay = @hour * 60 + @minute
+
+  tick: => new Time(@absoluteMinute + 1)
+
+  display: => "Day-#{@day} #{@hour}:#{@minute}"
+
+  @fromHour: (hour, minute, day = 0) ->
+    new Time(minute + 60 * (hour + 24 * day) )
 
 class window.Clock extends WithEvents
   # start at 6Am in the morning
-  constructor: (@msPerTick = 1000, @currentTime = 5 * 60) -> super()
+  constructor: (@msPerTick = 1000, startMinute = 5 * 60) ->
+    @time = new Time(startMinute)
+    super()
 
   setNewSpeed: (msPerTick) ->
     @stop()
@@ -213,16 +231,16 @@ class window.Clock extends WithEvents
 
   _intervalId: null
 
-  realMinute: => @currentTime % (24 * 60) #minute of the day
+  realMinute: => @time % (24 * 60) #minute of the day
 
-  hour: => Math.floor(@realMinute() / 60) #hour of the day
-  minute: => @currentTime % 60 #minute of the hour
-  day: => Math.floor(@currentTime / (24 * 60))
+  hour: => @time.hour
+  minute: => @time.minute
+  day: => @time.day
 
   tick: =>
-    @currentTime += 1
-    @trigger("tick", @currentTime)
-    @trigger("tick-" + @currentTime)
+    @time = @time.tick()
+    @trigger("tick", @time)
+    @trigger("tick-" + @time.absoluteMinute)
 
   multipleTicks: =>
     if @msPerTick is 0
