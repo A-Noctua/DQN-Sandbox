@@ -1,5 +1,7 @@
-log = (msg) =>
-#  console.log msg
+log = (args...) =>
+  console.log args...
+
+
 
 class WithEvents
   constructor: ->
@@ -78,12 +80,11 @@ class Trainer
   state: =>
     track = @player.playingTrack or Track.empty()
     [
-      track.artistId / 20.0
-      track.genreId / 30.0
-      @player.preferenceFor(track)
+      Math.max(0, track.artistId / 20.0)
+      Math.max(0, track.genreId / 30.0)
       @player.location.lat / 100.0
       @player.location.lon / 100.0
-      @player.clock.time.minuteOfDay / (24 * 60)
+      @player.clock.time.hour / 24
     ]
 
   registerRewards: =>
@@ -105,30 +106,64 @@ class User extends WithSimulation
   constructor:(clock, @player) ->
     super(clock)
     @player.on 'started-track', @reactToPlayingTrack
-    @history = FixedArray(10)
-    @currentActivity = new ActivityWithPreferredGenres(this, _.sample(Repo.genres, 4))
-    @scheduleDaily(Time.fromHour(6, 30), => @player.playRandom() )
-    @scheduleDaily(Time.fromHour(8, 30),  => @player.turnOff() )
+    @history = FixedArray(5)
 
+    @activities = [
+      new TimedActivity('running', this, ['Hard Rock'], 30, Time.fromHour(6, 30))
+      new TimedActivity('working', this, ['Alternative', 'Jazz', 'Classical'], 60, Time.fromHour(8, 30))
+      new TimedActivity('cooking', this, ['Rap', 'Comedy'], 45, Time.fromHour(19, 30))
+      new TimedActivity('reading', this, ['Alternative' ], 60, Time.fromHour(21, 30))
+    ]
+
+    for activity in @activities
+      @scheduleActivity(activity)
+
+  scheduleActivity: (activity) =>
+    if activity.start?
+      @scheduleDaily activity.start, @inActivity(activity)
+    else
+      @scheduleAfter _.random(2, 48) * 60, =>
+        @inActivity(activity)()
+        @scheduleActivity(activity)
+
+  inActivity: (activity) => =>
+    if !@currentActivity?
+      @currentActivity = activity
+      if activity.location?
+        @player.location = activity.location
+      @player.playRandom()
+      @scheduleAfter activity.length, =>
+        @player.turnOff()
+        @currentActivity = null
 
   reactToPlayingTrack: (track) =>
     @history.push(track)
     @currentActivity.respondToTrack(track)
 
-class ActivityWithPreferredGenres extends WithSimulation
 
-  constructor: (@user, @preferredGenres) ->
+class ActivityWithPreferredGenres extends WithSimulation
+  constructor: (@name, @user, @preferredGenres, @length) ->
     super(@user.clock)
 
   respondToTrack: (track) =>
     if _.includes(@preferredGenres, track.genre)
-      chance = (6 - _.where(@user.history.values(), genre: track.genre).length ) / 20
-      if chance > 0
-        @byChance chance, @user.player.thumbUp
+      recentGenres = _.uniq(_.pluck(@user.history.values(), 'genre'))
+      chance = (recentGenres.length / @preferredGenres.length) * 0.3
+      if chance > 0.5
+        chance = 0.5
+      @byChance chance, @user.player.thumbUp
     else
       @byChance 0.2, @user.player.thumbDown
       @byChance 0.5, @user.player.skip
 
+
+class TimedActivity extends ActivityWithPreferredGenres
+  constructor: (name, user, preferredGenres, length, @start) ->
+    super(name, user, preferredGenres, length)
+
+class LocationActivity extends ActivityWithPreferredGenres
+  constructor: (name, user, preferredGenres, length, @location) ->
+    super(name, user, preferredGenres, length)
 
 
 class Player extends WithSimulation
@@ -161,11 +196,11 @@ class Player extends WithSimulation
 
   thumbUp: =>
     @trackPreference[@playingTrack.id] = 1
-    @trigger('thumb-up')
+    @trigger('thumb-up', @playingTrack)
 
   thumbDown: =>
     @trackPreference[@playingTrack.id] = -1
-    @trigger('thumb-down')
+    @trigger('thumb-down', @playingTrack)
 
   preferenceFor: (track) => @trackPreference[track.id] or 0
 
@@ -194,8 +229,8 @@ class Player extends WithSimulation
       @trigger("turned-on")
 
   skip: =>
+    @trigger("skip", @playingTrack)
     @playingTrack = null
-    @trigger("skip")
     @next()
 
   turnOff: =>

@@ -7,9 +7,10 @@ document.addEventListener "DOMContentLoaded", ->
   world.clock.start()
   window.world = world
   history = FixedArray(100)
+  actionHistory = FixedArray(10)
 
   historyItemTemplate = _.template """
-    <b>{{ displayTime }}</b> - id: {{ track.id }}, genre: {{ track.genre }}, artist: {{ track.artist }}, title: {{ track.title }}
+    <b>{{ displayTime }}</b> - during: {{context}} track - id: {{ track.id }}, genre: {{ track.genre }}, artist: {{ track.artist }}, title: {{ track.title }}
 """
 
   displayTime = (timeInMinute) ->
@@ -23,16 +24,28 @@ document.addEventListener "DOMContentLoaded", ->
     _.throttle(_updateBrianInfo, 300)()
     updateHistory()
 
+  $('user-activities').innerHTML = (
+      for activity in world.user.activities
+        "<li><b>#{activity.name}</b> preferred genres:  #{activity.preferredGenres.join(', ')}</li>"
+    ).join('\n')
 
-  $('preferred-genres').innerText = world.user.currentActivity.preferredGenres.join(', ')
+  for event in ['thumb-up','thumb-down','skip']
+    callback = (e) -> (track) ->
+      actionHistory.push {action: e, track: track, context: world.user.currentActivity?.name }
+    world.player.on event, callback(event)
 
   _updateHistory = ->
+
     $('play-history').innerHTML = _.map(history.values(), historyItemTemplate).join('<br/>')
+    $('user-feedback-history').innerHTML = (for feedback in actionHistory.values()
+      "<li><b>#{feedback.action}</b> track-genre: #{ feedback.track.genre } when: #{feedback.context}</li>"
+    ).join('\n')
     $('current-time').innerHTML = "Day-#{world.clock.time.day}  #{world.clock.time.hour}:#{world.clock.time.minute} "
+    $('current-activity').innerHTML = world.user.currentActivity?.name or "Nothing"
 
   updateHistory = _.throttle(_updateHistory, 1000)
 
   world.player.on 'started-track', (track)->
-    history.push {time: world.clock.now, track: track, displayTime: world.clock.time.display() }
+    history.push {time: world.clock.now, track: track, displayTime: world.clock.time.display(), context: world.user.currentActivity?.name }
 
 
