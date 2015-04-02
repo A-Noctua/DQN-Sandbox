@@ -69,7 +69,7 @@ class Trainer
 
   executeAction: =>
     state = @state()
-    log "reporting state", state
+    console.log "reporting state", state
     actionIndex = @brain.forward(state)
     log "sending command", @actions[actionIndex]
     @player.sendCommand(@actions[actionIndex])
@@ -82,8 +82,8 @@ class Trainer
     [
       Math.max(0, track.artistId / 20.0)
       Math.max(0, track.genreId / 30.0)
-      @player.location.lat / 100.0
-      @player.location.lon / 100.0
+      @player.location.lat - 20
+      @player.location.lon - 39
       @player.clock.time.hour / 24
     ]
 
@@ -109,10 +109,13 @@ class User extends WithSimulation
     @history = FixedArray(5)
 
     @activities = [
-      new TimedActivity('running', this, ['Hard Rock'], 30, Time.fromHour(6, 30))
-      new TimedActivity('working', this, ['Alternative', 'Jazz', 'Classical'], 60, Time.fromHour(8, 30))
-      new TimedActivity('cooking', this, ['Rap', 'Comedy'], 45, Time.fromHour(19, 30))
-      new TimedActivity('reading', this, ['Alternative' ], 60, Time.fromHour(21, 30))
+#      new TimedActivity('running', this, ['Hard Rock'], 30, Time.fromHour(6, 30))
+#      new TimedActivity('working', this, ['Alternative', 'Jazz', 'Classical'], 60, Time.fromHour(8, 30))
+#      new TimedActivity('cooking', this, ['Rap', 'Comedy'], 45, Time.fromHour(19, 30))
+#      new TimedActivity('reading', this, ['Alternative' ], 60, Time.fromHour(21, 30))
+      new LocationActivity('Gym', this, ['Hard Rock'], 60, {lat: 20.101, lon: 40.201})
+      new LocationActivity('Office', this, ['Alternative', 'Jazz', 'Classical'], 120, {lat: 20.501, lon: 41.301})
+      new LocationActivity('Home', this, ['Rap', 'Comedy'], 120, {lat: 21.101, lon: 39.201})
     ]
 
     for activity in @activities
@@ -122,7 +125,7 @@ class User extends WithSimulation
     if activity.start?
       @scheduleDaily activity.start, @inActivity(activity)
     else
-      @scheduleAfter _.random(2, 48) * 60, =>
+      @scheduleAfter _.random(4, 36) * 60, =>
         @inActivity(activity)()
         @scheduleActivity(activity)
 
@@ -220,7 +223,7 @@ class Player extends WithSimulation
       else
         @playingTrack = null
 
-  location: {lat: 30.011, lon: 34.322}
+  location: {lat: 20.011, lon: 39.322}
 
 
   turnOn: =>

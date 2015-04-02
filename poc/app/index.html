@@ -19,15 +19,28 @@
   <script src="scripts/page.js"></script>
 
 </head>
-<body>
+<body style="font-size: 11px">
 
 <hr />
 <h3>User activities</h3>
 <ul id="user-activities"></ul>
 <hr />
 <h4><a id="current-time"></a> - <a id="current-activity"></a></h4>
-<h3>Recent User feedback</h3>
-<ul id="user-feedback-history"></ul>
+<table style="width: 100%">
+  <tr>
+    <td style="width: 50%">
+      <h3>Recent User feedback</h3>
+      <ul id="user-feedback-history"></ul>
+
+    </td>
+    <td style="width: 100%; vertical-align: top">
+      <h3>training info</h3>
+      <div id="brain-info">
+    </td>
+  </tr>
+
+</table>
+
 <h3>Recent playing history</h3>
 <div id="play-history" style="height: 300px; overflow: auto"></div>
 </div>
@@ -38,9 +51,6 @@
 <button onclick="world.trainer.brain.learning = false">Stop Learning</button>
 <button onclick="world.trainer.brain.learning = true">Start Learning</button>
 <hr />
-<h3>training info</h3>
-
-<div id="brain-info">
 </div>
 </body>
 </html>

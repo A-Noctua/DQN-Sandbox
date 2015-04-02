@@ -41,7 +41,7 @@ document.addEventListener "DOMContentLoaded", ->
       "<li><b>#{feedback.action}</b> track-genre: #{ feedback.track.genre } when: #{feedback.context}</li>"
     ).join('\n')
     $('current-time').innerHTML = "Day-#{world.clock.time.day}  #{world.clock.time.hour}:#{world.clock.time.minute} "
-    $('current-activity').innerHTML = world.user.currentActivity?.name or "Nothing"
+    $('current-activity').innerHTML = world.user.currentActivity?.name or "App turned off"
 
   updateHistory = _.throttle(_updateHistory, 1000)
 
