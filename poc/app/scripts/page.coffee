@@ -6,8 +6,8 @@ document.addEventListener "DOMContentLoaded", ->
   world = new World(new Clock(500))
   world.clock.start()
   window.world = world
-  history = FixedArray(100)
-  actionHistory = FixedArray(10)
+  history = FixedArray(500)
+  actionHistory = FixedArray(50)
 
   historyItemTemplate = _.template """
     <b>{{ displayTime }}</b> - during: {{context}} track - id: {{ track.id }}, genre: {{ track.genre }}, artist: {{ track.artist }}, title: {{ track.title }}

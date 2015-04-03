@@ -84,7 +84,7 @@ class Trainer
       Math.max(0, track.genreId / 30.0)
       @player.location.lat - 20
       @player.location.lon - 39
-      @player.clock.time.hour / 24
+      @player.clock.time.minuteOfDay / (24 * 60)
     ]
 
   registerRewards: =>
@@ -109,31 +109,29 @@ class User extends WithSimulation
     @history = FixedArray(5)
 
     @activities = [
-#      new TimedActivity('running', this, ['Hard Rock'], 30, Time.fromHour(6, 30))
-#      new TimedActivity('working', this, ['Alternative', 'Jazz', 'Classical'], 60, Time.fromHour(8, 30))
-#      new TimedActivity('cooking', this, ['Rap', 'Comedy'], 45, Time.fromHour(19, 30))
-#      new TimedActivity('reading', this, ['Alternative' ], 60, Time.fromHour(21, 30))
-      new LocationActivity('Gym', this, ['Hard Rock'], 60, {lat: 20.101, lon: 40.201})
-      new LocationActivity('Office', this, ['Alternative', 'Jazz', 'Classical'], 120, {lat: 20.501, lon: 41.301})
-      new LocationActivity('Home', this, ['Rap', 'Comedy'], 120, {lat: 21.101, lon: 39.201})
+      new ActivityWithPreferredGenres(user: this, name: 'Running', length: 30,   preferredGenres: ['Hard Rock'],          start: Time.fromHour(6, 30),  chanceSpan: 5)
+      new ActivityWithPreferredGenres(user: this, name: 'Office',  length: 120,  preferredGenres: ['Jazz', 'Classical'],  start: Time.fromHour(8, 0),  chanceSpan: 240,  location: {lat: 20.501, lon: 41.301})
+      new ActivityWithPreferredGenres(user: this, name: 'Gym',     length: 60,   preferredGenres: ['Hard Rock'],          start: Time.fromHour(16, 0), chanceSpan: 40,   location: {lat: 20.101, lon: 40.201})
+      new ActivityWithPreferredGenres(user: this, name: 'Cooking', length: 45,   preferredGenres: ['Comedy'],             start: Time.fromHour(19, 30), chanceSpan: 10,   location: {lat: 21.101, lon: 39.201})
+      new ActivityWithPreferredGenres(user: this, name: 'Reading', length: 60,  preferredGenres: ['Alternative'],        start: Time.fromHour(20, 30), chanceSpan: 120,  location: {lat: 21.101, lon: 39.201})
     ]
 
     for activity in @activities
       @scheduleActivity(activity)
 
   scheduleActivity: (activity) =>
-    if activity.start?
-      @scheduleDaily activity.start, @inActivity(activity)
-    else
-      @scheduleAfter _.random(4, 36) * 60, =>
-        @inActivity(activity)()
-        @scheduleActivity(activity)
+    @scheduleDaily activity.start, =>
+      @byChance 0.8, =>
+        after = _.random(activity.chanceSpan)
+        @scheduleAfter after, @inActivity(activity)
 
   inActivity: (activity) => =>
     if !@currentActivity?
       @currentActivity = activity
       if activity.location?
         @player.location = activity.location
+      else
+        @player.location = {lon: @player.location.lon + _.random(-1, 1), lat: @player.location.lat + _.random(-1,1)}
       @player.playRandom()
       @scheduleAfter activity.length, =>
         @player.turnOff()
@@ -145,7 +143,7 @@ class User extends WithSimulation
 
 
 class ActivityWithPreferredGenres extends WithSimulation
-  constructor: (@name, @user, @preferredGenres, @length) ->
+  constructor: ({@name, @user, @preferredGenres, @length, @location, @start, @chanceSpan}) ->
     super(@user.clock)
 
   respondToTrack: (track) =>
@@ -159,14 +157,6 @@ class ActivityWithPreferredGenres extends WithSimulation
       @byChance 0.2, @user.player.thumbDown
       @byChance 0.5, @user.player.skip
 
-
-class TimedActivity extends ActivityWithPreferredGenres
-  constructor: (name, user, preferredGenres, length, @start) ->
-    super(name, user, preferredGenres, length)
-
-class LocationActivity extends ActivityWithPreferredGenres
-  constructor: (name, user, preferredGenres, length, @location) ->
-    super(name, user, preferredGenres, length)
 
 
 class Player extends WithSimulation
