@@ -28,3 +28,7 @@ http://www.cs.toronto.edu/~tijmen/csc321/
 
 ### Introductory book about neural network (waiting for the deep learning chapter)
 http://neuralnetworksanddeeplearning.com/chap1.html
+
+
+### Deep Q Learning application in robotics
+http://rll.berkeley.edu/deeplearningrobotics/index.html
